@@ -1,73 +1,46 @@
-## Setup
+# HW1 Behavioral Cloning Report
 
-You can run this code on your own machine or on Google Colab. 
+This report is copied from https://github.com/mdeib/berkeley-deep-RL-pytorch-solutions/tree/master/hw1 (I used my own data and added some notes only)
 
-1. **Local option:** If you choose to run locally, you will need to install MuJoCo and some Python packages; see [installation.md](installation.md) for instructions.
-2. **Colab:** The first few sections of the notebook will install all required dependencies. You can try out the Colab option by clicking the badge below:
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/berkeleydeeprlcourse/homework_fall2023/blob/master/hw1/cs285/scripts/run_hw1.ipynb)
-
-## Complete the code
-
-Fill in sections marked with `TODO`. In particular, edit
- - [policies/MLP_policy.py](cs285/policies/MLP_policy.py)
- - [infrastructure/utils.py](cs285/infrastructure/utils.py)
- - [scripts/run_hw1.py](cs285/scripts/run_hw1.py)
-
-You have the option of running locally or on Colab using
- - [scripts/run_hw1.py](cs285/scripts/run_hw1.py) (if running locally) or [scripts/run_hw1.ipynb](cs285/scripts/run_hw1.ipynb) (if running on Colab)
-
-See the homework pdf for more details.
-
-## Run the code
-
-Tip: While debugging, you probably want to keep the flag `--video_log_freq -1` which will disable video logging and speed up the experiment. However, feel free to remove it to save videos of your awesome policy!
-
-If running on Colab, adjust the `#@params` in the `Args` class according to the commmand line arguments above.
-
-### Section 1 (Behavior Cloning)
-Command for problem 1:
-
-```
-python cs285/scripts/run_hw1.py \
-	--expert_policy_file cs285/policies/experts/Ant.pkl \
-	--env_name Ant-v4 --exp_name bc_ant --n_iter 1 \
-	--expert_data cs285/expert_data/expert_data_Ant-v4.pkl \
-	--video_log_freq -1
+Below is the HW1 report. All data used can be found in the results folder - videos aren't included to save space. To view the tensorboard for a specific part navigate to that part's folder (not the subfolders) and run 
+```commandline
+tensorboard --logdir .
 ```
 
-Make sure to also try another environment.
-See the homework PDF for more details on what else you need to run.
-To generate videos of the policy, remove the `--video_log_freq -1` flag.
+## Question 1.2
 
-### Section 2 (DAgger)
-Command for section 1:
-(Note the `--do_dagger` flag, and the higher value for `n_iter`)
+The agent was trained on 1000 steps of expert behavior in each environment (v4) and was evaluated for 10000 steps to get an accurate mean performance. The agent itself had an MLP policy consisting of 2 hidden layers of 64 neurons each (default value).
 
-```
-python cs285/scripts/run_hw1.py \
-    --expert_policy_file cs285/policies/experts/Ant.pkl \
-    --env_name Ant-v4 --exp_name dagger_ant --n_iter 10 \
-    --do_dagger --expert_data cs285/expert_data/expert_data_Ant-v4.pkl \
-	--video_log_freq -1
-```
+| Environment |      Expert      | Behavioral Cloning | Mean Percent Performance |
+|-------------|:----------------:|:------------------:|:------------------------:|
+| Ant         |  4722 ± 146.4  |   4319 ± 1227  |          91.46%          |
+| HalfCheetah |  4080 ± 82.4 |  3970 ± 110.8  |          97.30%          |
+| Hopper      |  3718 ± 1.787  |   1156 ± 163   |          31.09%          |
+| Walker2d    |  4815 ± 1130  |    928 ± 671.6   |           19.27%          |
 
-Make sure to also try another environment.
-See the homework PDF for more details on what else you need to run.
+From the table the agent achieved > 30% performance in Ant, HalfCheetah, and Hopper. The Walker2d env is somehow more difficult but not too much as the agent can fit well simply for more training steps (see 1.3)
 
-## Visualization the saved tensorboard event file:
+## Question 1.3
 
-You can visualize your runs using tensorboard:
-```
-tensorboard --logdir data
-```
+I originally set the training steps to be 10000 and the agent was able to achieve > 70% performance for every environment, which is a little skeptical and didn't match the trend of mdeib's experiments . Therefore, I lower the training steps and found the trend matched. I suggest that this could result from the change made to the homework.
+For this question we will graph evaluation performance as a function of training steps. A data point was taken every 500 training steps, and it was trained for a total of 10000 steps. The mean returns throughout training are shown below:
 
-You will see scalar summaries as well as videos of your trained policies (in the 'images' tab).
+![Evaluation Average Over Training Steps](bc_eval_avg.png)
 
-You can choose to visualize specific runs with a comma-separated list:
-```
-tensorboard --logdir data/run1,data/run2,data/run3...
-```
+It can be seen that the agent was able to improve greatly with more training updates. Also notable is the significant initial time it took to actually begin performing.
 
-If running on Colab, you will be using the `%tensorboard` [line magic](https://ipython.readthedocs.io/en/stable/interactive/magics.html) to do the same thing; see the [notebook](cs285/scripts/run_hw1.ipynb) for more details.
+![Evaluation Standard Deviation Over Training Steps](bc_eval_std.png)
 
+While average performance seems to be quite good, the standard deviation over the course of training is a bit more telling, as is the min/max returns. The agent continues to have trials where it makes a mistake and is unable to recover, resulting in a terrible rollout and a large standard deviation. If the agent was really learning to perform well in the environment we would see the standard deviation fall as it begins to consistently do well. This perfectly illustrates the weaknesses of behavioral cloning, and leads into question 2.2.
+
+## Question 2.2
+
+For this question dagger learning was done on the Walker2d environment used in question 1.3. In the first 1000 steps behavioral cloning was done, after which 9 iterations of dagger were carried out. Thus a total of 10k training steps were done, just like in question 1.3. All other things were kept the same. This allows the usage of dagger to be fairly tested. The average returns are below:
+
+![Evaluation Average](dagger_eval_avg.png)
+
+It can be seen that using dagger instead of training behavioral cloning further yielded better average returns. This is good but the real test is the standard deviation:
+
+![Evaluation Standard Deviation](dagger_eval_std.png)
+
+Unlike in question 1.3 the standard deviation drops dramatically as more dagger iterations are done. This shows that dagger has taught the agent to actually correct its mistakes, instead of failing as soon as it deviates slightly from the experts path. Thus dagger is shown to provide agent robustness that pure behavioral cloning fails to give.
