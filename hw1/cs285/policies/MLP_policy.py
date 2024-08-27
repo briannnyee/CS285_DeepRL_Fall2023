@@ -131,7 +131,8 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         # `torch.distributions.Distribution` object. It's up to you!
         mean = self.mean_net(observation)
         std = torch.exp(self.logstd)
-        action = mean
+        # action = distributions.Normal(mean, std).sample()
+        action = mean + std * torch.randn_like(mean)
         return action
 
     def update(self, observations, actions):
@@ -144,7 +145,9 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             dict: 'Training Loss': supervised learning loss
         """
         # TODO: update the policy and return the loss
-        learned_actions = self.mean_net(torch.from_numpy(observations).float().to(ptu.device))
+
+        # learned_actions = self.mean_net(torch.from_numpy(observations).float().to(ptu.device))
+        learned_actions = self.forward(torch.from_numpy(observations).float().to(ptu.device))
         actions = torch.from_numpy(actions).float().to(ptu.device)
         loss = F.mse_loss(learned_actions, actions)
         self.optimizer.zero_grad()
